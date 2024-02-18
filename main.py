@@ -52,7 +52,6 @@ class DataInsert(BaseModel):
     x: float
     y: float
     z: float
-    id_device: int
 
 Base.metadata.create_all(bind=engine)
 class StatisticsRequest(BaseModel):
@@ -130,12 +129,11 @@ async def startup_event():
 
     cur.close()
 
-@app.post("/data")
-async def insert_data(data: DataInsert):
+@app.post("/device/{id_device}/readings")
+async def insert_data(id_device: int, data: DataInsert):
     x = data.x
     y = data.y
     z = data.z
-    id_device = data.id_device
     cur = conn.cursor()
 
 
@@ -149,7 +147,7 @@ async def insert_data(data: DataInsert):
 
     return {"message": "Data inserted successfully"}
 
-@app.get("/data/{device_id}")
+@app.get("/device/{device_id}/readings")
 async def get_data(device_id: int):
 
     cur = conn.cursor()
@@ -176,7 +174,7 @@ async def get_data(device_id: int):
 
     return {"data": data}
 
-@app.get("/characteristics/")
+@app.get("/devices/{id}/stats/")
 async def get_characteristics(start_date: Optional[str] = None, end_date: Optional[str] = None):
     if start_date and end_date:
         try:
@@ -279,42 +277,6 @@ async def get_characteristics(start_date: Optional[str] = None, end_date: Option
 
         return characteristics
 
-
-@app.get("/characteristics", response_model=Dict[str, Dict[str, float]])
-async def read_characteristics(start_date: Optional[str] = None, end_date: Optional[str] = None):
-    try:
-        if start_date is not None and end_date is not None:
-            characteristics = get_characteristics(start_date, end_date)
-        else:
-            characteristics = get_characteristics()
-        
-    
-        result = {
-            "x": {
-                "min": characteristics["min_x"],
-                "max": characteristics["max_x"],
-                "count": characteristics["count_x"],
-                "sum": characteristics["sum_x"],
-                "median": characteristics["median_x"]
-            },
-            "y": {
-                "min": characteristics["min_y"],
-                "max": characteristics["max_y"],
-                "count": characteristics["count_y"],
-                "sum": characteristics["sum_y"],
-                "median": characteristics["median_y"]
-            },
-            "z": {
-                "min": characteristics["min_z"],
-                "max": characteristics["max_z"],
-                "count": characteristics["count_z"],
-                "sum": characteristics["sum_z"],
-                "median": characteristics["median_z"]
-            }
-        }
-        return {"result": result}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"message": "Internal server error"})
 
 @app.post("/users/", response_model=UserResponse)
 async def create_user(user_request: CreateUserRequest):
@@ -467,7 +429,7 @@ def analyze_statistics_by_user_device(user_id, device_id=None):
 
     return results
 
-@app.get("/user_statistics/{user_id}/{device_id}")
+@app.get("/users/{user_id}/devices/{device_id}/stats")
 async def get_user_statistics(user_id: int, device_id: Optional[int] = None):
 
     results = analyze_statistics_by_user_device(user_id, device_id)
@@ -475,7 +437,7 @@ async def get_user_statistics(user_id: int, device_id: Optional[int] = None):
         raise HTTPException(status_code=404, detail="No statistics found")
     return results
 
-@app.get("/user_statistics/{user_id}")
+@app.get("/users/{user_id}/stats")
 async def get_user_statistics(user_id: int):
 
     results = analyze_statistics_by_user(user_id)
